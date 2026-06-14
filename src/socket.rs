@@ -96,6 +96,14 @@ pub trait Socket: Sized {
         &mut self,
         buffer: &mut [u8; MTU_MAX],
     ) -> Result<Option<(Self::Address, PacketReceived)>, Self::Error>;
+
+    /// Return the port this socket is bound to, if available.
+    ///
+    /// Used by [`PacketProcessor`](crate::PacketProcessor) implementations that need the
+    /// local port for header validation.
+    fn local_port(&self) -> Option<u16> {
+        None
+    }
 }
 
 /// Return type of [`Socket::receive`], representing either a complete packet, or a partial
@@ -148,5 +156,9 @@ impl Socket for UdpSocket {
             Err(err) if err.kind() == ErrorKind::WouldBlock => Ok(None),
             Err(err) => Err(err),
         }
+    }
+
+    fn local_port(&self) -> Option<u16> {
+        self.local_addr().ok().map(|a| a.port())
     }
 }

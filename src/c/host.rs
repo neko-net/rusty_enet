@@ -35,6 +35,7 @@ pub(crate) struct ENetHost<S: Socket> {
     pub(crate) time: MaybeUninit<Box<dyn Fn() -> Duration>>,
     pub(crate) compressor: MaybeUninit<Option<Box<dyn Compressor>>>,
     pub(crate) packet_processor: MaybeUninit<Option<Box<dyn PacketProcessor>>>,
+    pub(crate) local_port: u16,
     pub(crate) packet_data: [[u8; PROTOCOL_MAXIMUM_MTU]; 2],
     pub(crate) received_address: MaybeUninit<Option<S::Address>>,
     pub(crate) received_data: *mut u8,
@@ -58,6 +59,7 @@ pub(crate) unsafe fn enet_host_create<S: Socket>(
     time: Box<dyn Fn() -> Duration>,
     seed: Option<u32>,
     packet_processor: Option<Box<dyn PacketProcessor>>,
+    local_port: u16,
 ) -> Result<*mut ENetHost<S>, S::Error> {
     let mut current_peer: *mut ENetPeer<S>;
     let host: *mut ENetHost<S> = enet_malloc(Layout::new::<ENetHost<S>>()).cast();
@@ -108,6 +110,7 @@ pub(crate) unsafe fn enet_host_create<S: Socket>(
     (*host).maximum_waiting_data = HOST_DEFAULT_MAXIMUM_WAITING_DATA as i32 as usize;
     (*host).compressor.write(None);
     (*host).packet_processor.write(None);
+    (*host).local_port = local_port;
     enet_list_clear(&mut (*host).dispatch_queue);
     current_peer = (*host).peers;
     while current_peer < ((*host).peers).add((*host).peer_count) {

@@ -30,6 +30,7 @@ use crate::{
     ENET_PEER_STATE_CONNECTED, ENET_PEER_STATE_CONNECTING, ENET_PEER_STATE_CONNECTION_PENDING,
     ENET_PEER_STATE_CONNECTION_SUCCEEDED, ENET_PEER_STATE_DISCONNECTED,
     ENET_PEER_STATE_DISCONNECTING, ENET_PEER_STATE_DISCONNECT_LATER, ENET_PEER_STATE_ZOMBIE,
+    PacketProcessor,
 };
 
 pub(crate) type _ENetProtocolCommand = u32;
@@ -1396,6 +1397,17 @@ unsafe fn enet_protocol_handle_incoming_commands<S: Socket>(
     if (*host).received_data_length < 2_usize {
         return false;
     }
+    let mut proc_header_ptr: *const u8 = core::ptr::null();
+    let mut proc_size: usize = 0;
+    if let Some(processor) = (*host).packet_processor.assume_init_ref() {
+        proc_size = processor.header_size();
+        if (*host).received_data_length < proc_size + 2 {
+            return false;
+        }
+        proc_header_ptr = (*host).received_data;
+        (*host).received_data = (*host).received_data.add(proc_size);
+        (*host).received_data_length = (*host).received_data_length.wrapping_sub(proc_size);
+    }
     let header: *mut ENetProtocolHeader = (*host).received_data.cast();
     peer_id = u16::from_be((*header).peer_id);
     let session_id = ((peer_id as i32 & ENET_PROTOCOL_HEADER_SESSION_MASK as i32)
@@ -1437,6 +1449,17 @@ unsafe fn enet_protocol_handle_incoming_commands<S: Socket>(
                 && session_id as i32 != (*peer).incoming_session_id as i32
         {
             return false;
+        }
+    }
+    if !proc_header_ptr.is_null() && !peer.is_null() {
+        let processor = (*host).packet_processor.assume_init_mut()
+            .as_mut()
+            .unwrap(); // safe: we already checked it's Some above
+        let proc_header = super::from_raw_parts_or_empty(proc_header_ptr, proc_size);
+        let port = (*host).local_port;
+        match processor.validate_incoming(proc_header, port, (*peer).reserved) {
+            Some(new_reserved) => (*peer).reserved = new_reserved,
+            None => return false,
         }
     }
     if flags as i32 & ENET_PROTOCOL_HEADER_FLAG_COMPRESSED as i32 != 0 {

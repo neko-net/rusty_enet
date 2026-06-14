@@ -116,6 +116,7 @@ impl<S: Socket> Host<S> {
             }));
         }
         unsafe {
+            let local_port = socket.local_port().unwrap_or(0);
             let host = enet_host_create::<S>(
                 socket,
                 settings.peer_limit,
@@ -125,6 +126,7 @@ impl<S: Socket> Host<S> {
                 settings.time,
                 settings.seed,
                 settings.packet_processor,
+                local_port,
             )
             .map_err(|err| HostNewError::FailedToInitializeSocket(err))?;
             let mut peers = Vec::new();
