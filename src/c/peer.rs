@@ -181,6 +181,9 @@ pub(crate) unsafe fn enet_peer_send<S: Socket>(
     fragment_length = ((*peer).mtu as usize)
         .wrapping_sub(::core::mem::size_of::<ENetProtocolHeader>())
         .wrapping_sub(::core::mem::size_of::<ENetProtocolSendFragment>());
+    if let Some(processor) = (*(*peer).host).packet_processor.assume_init_ref() {
+        fragment_length = fragment_length.wrapping_sub(processor.header_size());
+    }
     if ((*(*peer).host).checksum.assume_init_ref()).is_some() {
         fragment_length =
             (fragment_length as u64).wrapping_sub(::core::mem::size_of::<u32>() as u64) as usize;

@@ -11,8 +11,8 @@ use crate::{
     enet_host_check_events, enet_host_compress, enet_host_connect, enet_host_create,
     enet_host_destroy, enet_host_flush, enet_host_service,
     error::{BadParameter, HostNewError, NoAvailablePeers},
-    time_since_epoch, Compressor, ENetEvent, ENetHost, ENetPeer, Event, Packet, Peer, PeerID,
-    PeerState, Socket, ENET_EVENT_TYPE_CONNECT, ENET_EVENT_TYPE_DISCONNECT,
+    time_since_epoch, Compressor, ENetEvent, ENetHost, ENetPeer, Event, Packet, PacketProcessor,
+    Peer, PeerID, PeerState, Socket, ENET_EVENT_TYPE_CONNECT, ENET_EVENT_TYPE_DISCONNECT,
     ENET_EVENT_TYPE_RECEIVE,
 };
 

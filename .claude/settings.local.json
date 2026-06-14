@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo check:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(RUSTDOCFLAGS=\"-Dwarnings\" cargo doc:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(npx napi:*)",
+      "Bash(node test.js)",
+      "Bash(node:*)",
+      "Bash(npm test:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl:*)",
+      "WebFetch(domain:raw.githubusercontent.com)"
+    ]
+  }
+}

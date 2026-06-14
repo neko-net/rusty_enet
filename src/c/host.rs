@@ -109,7 +109,7 @@ pub(crate) unsafe fn enet_host_create<S: Socket>(
     (*host).maximum_packet_size = HOST_DEFAULT_MAXIMUM_PACKET_SIZE as i32 as usize;
     (*host).maximum_waiting_data = HOST_DEFAULT_MAXIMUM_WAITING_DATA as i32 as usize;
     (*host).compressor.write(None);
-    (*host).packet_processor.write(None);
+    (*host).packet_processor.write(packet_processor);
     (*host).local_port = local_port;
     enet_list_clear(&mut (*host).dispatch_queue);
     current_peer = (*host).peers;

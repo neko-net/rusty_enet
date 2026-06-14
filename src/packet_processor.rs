@@ -34,5 +34,5 @@ pub trait PacketProcessor: Send {
     /// `port` is the host socket's local port.
     /// `peer_reserved` is the current value of the sending peer's reserved
     /// field (0 initially, then the value returned by the previous call).
-    fn validate_incoming(&mut self, header: &[u8], port: u16, peer_reserved: u32) -> Option<u32>;
+    fn validate_incoming(&mut self, header: &[u8], port: u16, peer_reserved: u16) -> Option<u16>;
 }

@@ -30,7 +30,6 @@ use crate::{
     ENET_PEER_STATE_CONNECTED, ENET_PEER_STATE_CONNECTING, ENET_PEER_STATE_CONNECTION_PENDING,
     ENET_PEER_STATE_CONNECTION_SUCCEEDED, ENET_PEER_STATE_DISCONNECTED,
     ENET_PEER_STATE_DISCONNECTING, ENET_PEER_STATE_DISCONNECT_LATER, ENET_PEER_STATE_ZOMBIE,
-    PacketProcessor,
 };
 
 pub(crate) type _ENetProtocolCommand = u32;
@@ -2108,8 +2107,14 @@ unsafe fn enet_protocol_send_outgoing_commands<S: Socket>(
     event: *mut ENetEvent<S>,
     check_for_timeouts: i32,
 ) -> Result<bool, S::Error> {
-    let mut header_data: [u8; 8] = [0; 8];
-    let header: *mut ENetProtocolHeader = header_data.as_mut_ptr().cast();
+    let proc_size = (*host)
+        .packet_processor
+        .assume_init_ref()
+        .as_ref()
+        .map_or(0, |p| p.header_size());
+    let mut header_data: [u8; 64] = [0; 64];
+    let proc_header: *mut u8 = header_data.as_mut_ptr();
+    let header: *mut ENetProtocolHeader = header_data.as_mut_ptr().add(proc_size).cast();
     let mut should_compress: usize;
     let mut sent_unreliable_commands: ENetList = ENetList {
         sentinel: ENetListNode {
@@ -2134,7 +2139,8 @@ unsafe fn enet_protocol_send_outgoing_commands<S: Socket>(
                 (*host).header_flags = 0_i32 as u16;
                 (*host).command_count = 0_i32 as usize;
                 (*host).buffer_count = 1_i32 as usize;
-                (*host).packet_size = ::core::mem::size_of::<ENetProtocolHeader>();
+                (*host).packet_size = ::core::mem::size_of::<ENetProtocolHeader>()
+                    .wrapping_add(proc_size);
                 if (*current_peer).acknowledgements.sentinel.next
                     != core::ptr::addr_of_mut!((*current_peer).acknowledgements.sentinel)
                 {
@@ -2222,20 +2228,37 @@ unsafe fn enet_protocol_send_outgoing_commands<S: Socket>(
                         }
                         let fresh34 = &mut (*((*host).buffers).as_mut_ptr()).data;
                         *fresh34 = header_data.as_mut_ptr();
+                        if proc_size > 0 {
+                            if let Some(processor) =
+                                (*host).packet_processor.assume_init_mut()
+                            {
+                                let header_slice = super::from_raw_parts_or_empty_mut(
+                                    proc_header,
+                                    proc_size,
+                                );
+                                processor.write_outgoing(
+                                    header_slice,
+                                    (*current_peer).outgoing_peer_id,
+                                    (*host).local_port,
+                                );
+                            }
+                        }
                         if (*host).header_flags as i32 & ENET_PROTOCOL_HEADER_FLAG_SENT_TIME as i32
                             != 0
                         {
                             (*header).sent_time =
                                 (((*host).service_time & 0xffff_i32 as u32) as u16).to_be();
-                            (*((*host).buffers).as_mut_ptr()).data_length =
-                                ::core::mem::size_of::<ENetProtocolHeader>();
+                            (*((*host).buffers).as_mut_ptr()).data_length = proc_size
+                                .wrapping_add(::core::mem::size_of::<ENetProtocolHeader>());
                         } else {
-                            (*((*host).buffers).as_mut_ptr()).data_length = 2;
+                            (*((*host).buffers).as_mut_ptr()).data_length =
+                                proc_size.wrapping_add(2);
                         }
                         should_compress = 0_i32 as usize;
                         if let Some(compressor) = (*host).compressor.assume_init_mut() {
                             let original_size: usize = ((*host).packet_size)
-                                .wrapping_sub(::core::mem::size_of::<ENetProtocolHeader>());
+                                .wrapping_sub(::core::mem::size_of::<ENetProtocolHeader>())
+                                .wrapping_sub(proc_size);
                             let mut in_buffers: [&[u8]; BUFFER_MAXIMUM as usize] =
                                 core::array::from_fn(|_| {
                                     from_raw_parts_or_empty::<u8>(core::ptr::null(), 0)
