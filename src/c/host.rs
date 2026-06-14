@@ -4,7 +4,7 @@ use crate::{
     consts::*, enet_free, enet_list_clear, enet_malloc, enet_packet_destroy,
     enet_peer_queue_outgoing_command, enet_peer_reset, enet_peer_send, enet_time_get, Box,
     Compressor, ENetBuffer, ENetChannel, ENetList, ENetPacket, ENetPeer, ENetProtocol,
-    PacketProcessor, ENetProtocolCommandHeader, Socket, SocketOptions, ENET_PEER_STATE_CONNECTED,
+    ENetProtocolCommandHeader, PacketProcessor, Socket, SocketOptions, ENET_PEER_STATE_CONNECTED,
     ENET_PEER_STATE_CONNECTING, ENET_PEER_STATE_DISCONNECTED, ENET_PEER_STATE_DISCONNECT_LATER,
     ENET_PROTOCOL_COMMAND_BANDWIDTH_LIMIT, ENET_PROTOCOL_COMMAND_CONNECT,
     ENET_PROTOCOL_COMMAND_FLAG_ACKNOWLEDGE,
@@ -50,6 +50,7 @@ pub(crate) struct ENetHost<S: Socket> {
     pub(crate) maximum_packet_size: usize,
     pub(crate) maximum_waiting_data: usize,
 }
+#[allow(clippy::too_many_arguments)]
 pub(crate) unsafe fn enet_host_create<S: Socket>(
     mut socket: S,
     peer_count: usize,

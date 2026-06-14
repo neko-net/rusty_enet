@@ -1451,9 +1451,7 @@ unsafe fn enet_protocol_handle_incoming_commands<S: Socket>(
         }
     }
     if !proc_header_ptr.is_null() && !peer.is_null() {
-        let processor = (*host).packet_processor.assume_init_mut()
-            .as_mut()
-            .unwrap(); // safe: we already checked it's Some above
+        let processor = (*host).packet_processor.assume_init_mut().as_mut().unwrap(); // safe: we already checked it's Some above
         let proc_header = super::from_raw_parts_or_empty(proc_header_ptr, proc_size);
         let port = (*host).local_port;
         match processor.validate_incoming(proc_header, port, (*peer).reserved) {
@@ -2139,8 +2137,8 @@ unsafe fn enet_protocol_send_outgoing_commands<S: Socket>(
                 (*host).header_flags = 0_i32 as u16;
                 (*host).command_count = 0_i32 as usize;
                 (*host).buffer_count = 1_i32 as usize;
-                (*host).packet_size = ::core::mem::size_of::<ENetProtocolHeader>()
-                    .wrapping_add(proc_size);
+                (*host).packet_size =
+                    ::core::mem::size_of::<ENetProtocolHeader>().wrapping_add(proc_size);
                 if (*current_peer).acknowledgements.sentinel.next
                     != core::ptr::addr_of_mut!((*current_peer).acknowledgements.sentinel)
                 {
@@ -2229,13 +2227,9 @@ unsafe fn enet_protocol_send_outgoing_commands<S: Socket>(
                         let fresh34 = &mut (*((*host).buffers).as_mut_ptr()).data;
                         *fresh34 = header_data.as_mut_ptr();
                         if proc_size > 0 {
-                            if let Some(processor) =
-                                (*host).packet_processor.assume_init_mut()
-                            {
-                                let header_slice = super::from_raw_parts_or_empty_mut(
-                                    proc_header,
-                                    proc_size,
-                                );
+                            if let Some(processor) = (*host).packet_processor.assume_init_mut() {
+                                let header_slice =
+                                    super::from_raw_parts_or_empty_mut(proc_header, proc_size);
                                 processor.write_outgoing(
                                     header_slice,
                                     (*current_peer).outgoing_peer_id,
