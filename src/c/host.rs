@@ -50,7 +50,6 @@ pub(crate) struct ENetHost<S: Socket> {
     pub(crate) maximum_packet_size: usize,
     pub(crate) maximum_waiting_data: usize,
 }
-#[allow(clippy::too_many_arguments)]
 pub(crate) unsafe fn enet_host_create<S: Socket>(
     mut socket: S,
     peer_count: usize,
@@ -59,8 +58,6 @@ pub(crate) unsafe fn enet_host_create<S: Socket>(
     outgoing_bandwidth: u32,
     time: Box<dyn Fn() -> Duration>,
     seed: Option<u32>,
-    packet_processor: Option<Box<dyn PacketProcessor>>,
-    local_port: u16,
 ) -> Result<*mut ENetHost<S>, S::Error> {
     let mut current_peer: *mut ENetPeer<S>;
     let host: *mut ENetHost<S> = enet_malloc(Layout::new::<ENetHost<S>>()).cast();
@@ -110,8 +107,8 @@ pub(crate) unsafe fn enet_host_create<S: Socket>(
     (*host).maximum_packet_size = HOST_DEFAULT_MAXIMUM_PACKET_SIZE as i32 as usize;
     (*host).maximum_waiting_data = HOST_DEFAULT_MAXIMUM_WAITING_DATA as i32 as usize;
     (*host).compressor.write(None);
-    (*host).packet_processor.write(packet_processor);
-    (*host).local_port = local_port;
+    (*host).packet_processor.write(None);
+    (*host).local_port = 0;
     enet_list_clear(&mut (*host).dispatch_queue);
     current_peer = (*host).peers;
     while current_peer < ((*host).peers).add((*host).peer_count) {
@@ -272,6 +269,15 @@ pub(crate) unsafe fn enet_host_compress<S: Socket>(
     compressor: Option<Box<dyn Compressor>>,
 ) {
     *(*host).compressor.assume_init_mut() = compressor;
+}
+pub(crate) unsafe fn enet_host_packet_processor<S: Socket>(
+    host: *mut ENetHost<S>,
+    processor: Option<Box<dyn PacketProcessor>>,
+) {
+    *(*host).packet_processor.assume_init_mut() = processor;
+}
+pub(crate) unsafe fn enet_host_set_local_port<S: Socket>(host: *mut ENetHost<S>, port: u16) {
+    (*host).local_port = port;
 }
 pub(crate) unsafe fn enet_host_channel_limit<S: Socket>(
     host: *mut ENetHost<S>,

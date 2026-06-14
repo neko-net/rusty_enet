@@ -9,7 +9,8 @@ use crate::{
     },
     enet_host_bandwidth_limit, enet_host_broadcast, enet_host_channel_limit,
     enet_host_check_events, enet_host_compress, enet_host_connect, enet_host_create,
-    enet_host_destroy, enet_host_flush, enet_host_service,
+    enet_host_destroy, enet_host_flush, enet_host_packet_processor, enet_host_service,
+    enet_host_set_local_port,
     error::{BadParameter, HostNewError, NoAvailablePeers},
     time_since_epoch, Compressor, ENetEvent, ENetHost, ENetPeer, Event, Packet, PacketProcessor,
     Peer, PeerID, PeerState, Socket, ENET_EVENT_TYPE_CONNECT, ENET_EVENT_TYPE_DISCONNECT,
@@ -125,10 +126,10 @@ impl<S: Socket> Host<S> {
                 settings.outgoing_bandwidth_limit.unwrap_or(0),
                 settings.time,
                 settings.seed,
-                settings.packet_processor,
-                local_port,
             )
             .map_err(|err| HostNewError::FailedToInitializeSocket(err))?;
+            enet_host_packet_processor(host, settings.packet_processor);
+            enet_host_set_local_port(host, local_port);
             let mut peers = Vec::new();
             peers.reserve_exact((*host).peer_count);
             for peer_index in 0..(*host).peer_count {
