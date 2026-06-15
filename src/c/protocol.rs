@@ -1486,6 +1486,7 @@ unsafe fn enet_protocol_handle_incoming_commands<S: Socket>(
         );
         (*host).received_data = ((*host).packet_data[1_i32 as usize]).as_mut_ptr();
         (*host).received_data_length = header_size.wrapping_add(original_size);
+        proc_header_ptr = core::ptr::null();
     }
     if let Some(checksum_fn) = (*host).checksum.assume_init_ref() {
         let checksum_addr: *mut u8 =
