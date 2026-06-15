@@ -2124,7 +2124,7 @@ unsafe fn enet_protocol_send_outgoing_commands<S: Socket>(
         .packet_processor
         .assume_init_ref()
         .as_ref()
-        .map_or(0, |p| p.header_size());
+        .map_or(0, |p| p.outgoing_header_size());
     let mut header_data: [u8; 64] = [0; 64];
     let proc_header: *mut u8 = header_data.as_mut_ptr();
     let header: *mut ENetProtocolHeader = header_data.as_mut_ptr().add(proc_size).cast();

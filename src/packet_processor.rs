@@ -20,8 +20,17 @@
 ///
 /// Returns `None` to silently drop the packet.
 pub trait PacketProcessor: Send {
-    /// Size of the header this processor adds to every packet.
+    /// Size of the header this processor adds to every packet on the wire.
     fn header_size(&self) -> usize;
+
+    /// Size of the header to add on outgoing packets only.
+    ///
+    /// Defaults to [`header_size`]. Override this when the processor is
+    /// receive-only (e.g. only validates incoming packets but doesn't add
+    /// headers to outgoing ones).
+    fn outgoing_header_size(&self) -> usize {
+        self.header_size()
+    }
 
     /// Write the processor header bytes before an outgoing packet is sent.
     ///
