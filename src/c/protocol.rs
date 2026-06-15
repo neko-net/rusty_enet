@@ -1399,7 +1399,7 @@ unsafe fn enet_protocol_handle_incoming_commands<S: Socket>(
     let mut proc_header_ptr: *const u8 = core::ptr::null();
     let mut proc_size: usize = 0;
     if let Some(processor) = (*host).packet_processor.assume_init_ref() {
-        proc_size = processor.header_size();
+        proc_size = processor.incoming_header_size();
         if (*host).received_data_length < proc_size + 2 {
             return false;
         }

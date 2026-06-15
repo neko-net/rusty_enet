@@ -193,7 +193,7 @@ fn packet_processor_connect() {
     use crate::{Box, PacketProcessor};
     struct Noop;
     impl PacketProcessor for Noop {
-        fn header_size(&self) -> usize {
+        fn incoming_header_size(&self) -> usize {
             0
         }
         fn write_outgoing(&mut self, _: &mut [u8], _: u16, _: u16) {}
@@ -229,7 +229,7 @@ fn packet_processor_with_header() {
     /// 4-byte LE-u32 header with XOR trick: header[0..4] = port as LE u32.
     struct XorHeader;
     impl PacketProcessor for XorHeader {
-        fn header_size(&self) -> usize {
+        fn incoming_header_size(&self) -> usize {
             4
         }
         fn write_outgoing(&mut self, header: &mut [u8], _peer_id: u16, port: u16) {
@@ -271,7 +271,7 @@ fn packet_processor_with_checksum() {
 
     struct Noop;
     impl PacketProcessor for Noop {
-        fn header_size(&self) -> usize {
+        fn incoming_header_size(&self) -> usize {
             4
         }
         fn write_outgoing(&mut self, _: &mut [u8], _: u16, _: u16) {}
@@ -312,7 +312,7 @@ fn packet_processor_with_compressor_and_checksum() {
 
     struct Hdr;
     impl PacketProcessor for Hdr {
-        fn header_size(&self) -> usize {
+        fn incoming_header_size(&self) -> usize {
             6
         }
         fn write_outgoing(&mut self, header: &mut [u8], _peer_id: u16, port: u16) {
@@ -386,7 +386,7 @@ fn packet_processor_with_compressor() {
 
     struct Noop;
     impl PacketProcessor for Noop {
-        fn header_size(&self) -> usize {
+        fn incoming_header_size(&self) -> usize {
             6
         }
         fn write_outgoing(&mut self, _: &mut [u8], _: u16, _: u16) {}
@@ -421,7 +421,7 @@ fn processor_compressor_header_zero() {
 
     struct Noop;
     impl PacketProcessor for Noop {
-        fn header_size(&self) -> usize {
+        fn incoming_header_size(&self) -> usize {
             0
         }
         fn write_outgoing(&mut self, _: &mut [u8], _: u16, _: u16) {}
