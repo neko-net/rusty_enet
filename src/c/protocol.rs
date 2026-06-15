@@ -1399,7 +1399,7 @@ unsafe fn enet_protocol_handle_incoming_commands<S: Socket>(
     let mut proc_header_ptr: *const u8 = core::ptr::null();
     let mut proc_size: usize = 0;
     if let Some(processor) = (*host).packet_processor.assume_init_ref() {
-        proc_size = processor.header_size();
+        proc_size = processor.incoming_header_size();
         if (*host).received_data_length < proc_size + 2 {
             return false;
         }
@@ -1510,12 +1510,27 @@ unsafe fn enet_protocol_handle_incoming_commands<S: Socket>(
             checksum_addr,
             ::core::mem::size_of::<u32>(),
         );
-        buffer.data = (*host).received_data;
-        buffer.data_length = (*host).received_data_length;
-        let in_buffers = [super::from_raw_parts_or_empty(
-            buffer.data,
-            buffer.data_length,
-        )];
+        buffer.data = if !proc_header_ptr.is_null() {
+            proc_header_ptr.cast_mut()
+        } else {
+            (*host).received_data
+        };
+        buffer.data_length = if !proc_header_ptr.is_null() {
+            proc_size
+        } else {
+            (*host).received_data_length
+        };
+        let in_buffers = if !proc_header_ptr.is_null() {
+            [
+                super::from_raw_parts_or_empty(buffer.data, buffer.data_length),
+                super::from_raw_parts_or_empty((*host).received_data, (*host).received_data_length),
+            ]
+        } else {
+            [
+                super::from_raw_parts_or_empty(buffer.data, buffer.data_length),
+                super::from_raw_parts_or_empty(core::ptr::null(), 0),
+            ]
+        };
         if checksum_fn(&in_buffers) != desired_checksum {
             return false;
         }
@@ -2109,7 +2124,7 @@ unsafe fn enet_protocol_send_outgoing_commands<S: Socket>(
         .packet_processor
         .assume_init_ref()
         .as_ref()
-        .map_or(0, |p| p.header_size());
+        .map_or(0, |p| p.outgoing_header_size());
     let mut header_data: [u8; 64] = [0; 64];
     let proc_header: *mut u8 = header_data.as_mut_ptr();
     let header: *mut ENetProtocolHeader = header_data.as_mut_ptr().add(proc_size).cast();

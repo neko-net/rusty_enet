@@ -4,14 +4,14 @@
 /// # Send path (outgoing)
 ///
 /// `write_outgoing` is called once per outgoing packet. The provided `header`
-/// slice is `header_size()` bytes long and is zero-initialized. The processor
+/// slice is `outgoing_header_size()` bytes long and is zero-initialized. The processor
 /// writes its header bytes there. They are prepended before the standard ENet
 /// header and sent over the wire.
 ///
 /// # Receive path (incoming)
 ///
 /// `validate_incoming` is called for every incoming packet. The provided
-/// `header` slice contains the first `header_size()` bytes of the received
+/// `header` slice contains the first `incoming_header_size()` bytes of the received
 /// data. The processor validates them.
 ///
 /// Returns `Some(new_reserved)` if the packet is valid. `new_reserved` is
@@ -20,8 +20,16 @@
 ///
 /// Returns `None` to silently drop the packet.
 pub trait PacketProcessor: Send {
-    /// Size of the header this processor adds to every packet.
-    fn header_size(&self) -> usize;
+    /// Size of the header to strip and validate on incoming packets.
+    fn incoming_header_size(&self) -> usize;
+
+    /// Size of the header to add on outgoing packets.
+    ///
+    /// Defaults to [`incoming_header_size`] for symmetric processors. Override
+    /// to return 0 for receive-only (server) mode.
+    fn outgoing_header_size(&self) -> usize {
+        self.incoming_header_size()
+    }
 
     /// Write the processor header bytes before an outgoing packet is sent.
     ///
@@ -44,7 +52,7 @@ mod tests {
     struct TestProcessor;
 
     impl PacketProcessor for TestProcessor {
-        fn header_size(&self) -> usize {
+        fn incoming_header_size(&self) -> usize {
             6
         }
 

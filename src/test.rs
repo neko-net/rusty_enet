@@ -193,7 +193,7 @@ fn packet_processor_connect() {
     use crate::{Box, PacketProcessor};
     struct Noop;
     impl PacketProcessor for Noop {
-        fn header_size(&self) -> usize {
+        fn incoming_header_size(&self) -> usize {
             0
         }
         fn write_outgoing(&mut self, _: &mut [u8], _: u16, _: u16) {}
@@ -229,7 +229,7 @@ fn packet_processor_with_header() {
     /// 4-byte LE-u32 header with XOR trick: header[0..4] = port as LE u32.
     struct XorHeader;
     impl PacketProcessor for XorHeader {
-        fn header_size(&self) -> usize {
+        fn incoming_header_size(&self) -> usize {
             4
         }
         fn write_outgoing(&mut self, header: &mut [u8], _peer_id: u16, port: u16) {
@@ -263,4 +263,189 @@ fn packet_processor_with_header() {
     assert_eq!(events.len(), 2);
     assert!(events[0].is_connect_and(|e| e.to == host1));
     assert!(events[1].is_connect_and(|e| e.to == host2));
+}
+
+#[test]
+fn packet_processor_with_checksum() {
+    use crate::{Box, PacketProcessor};
+
+    struct Noop;
+    impl PacketProcessor for Noop {
+        fn incoming_header_size(&self) -> usize {
+            4
+        }
+        fn write_outgoing(&mut self, _: &mut [u8], _: u16, _: u16) {}
+        fn validate_incoming(&mut self, _: &[u8], _: u16, _: u16) -> Option<u16> {
+            Some(0)
+        }
+    }
+
+    let mut network = Network::new();
+    let host1 = network.create_host(enet::HostSettings {
+        peer_limit: 1,
+        checksum: Some(Box::new(crate::crc32)),
+        packet_processor: Some(Box::new(Noop)),
+        ..Default::default()
+    });
+    let host2 = network.create_host(enet::HostSettings {
+        peer_limit: 1,
+        checksum: Some(Box::new(crate::crc32)),
+        packet_processor: Some(Box::new(Noop)),
+        ..Default::default()
+    });
+
+    network.connect(host1, host2, 255, 5);
+    network.update(1);
+    let events = network.update(1);
+    assert_eq!(
+        events.len(),
+        2,
+        "connect events should fire with checksum+processor"
+    );
+    assert!(events[0].is_connect_and(|e| e.to == host1));
+    assert!(events[1].is_connect_and(|e| e.to == host2));
+}
+
+#[test]
+fn packet_processor_with_compressor_and_checksum() {
+    use crate::{Box, PacketProcessor, RangeCoder};
+
+    struct Hdr;
+    impl PacketProcessor for Hdr {
+        fn incoming_header_size(&self) -> usize {
+            6
+        }
+        fn write_outgoing(&mut self, header: &mut [u8], _peer_id: u16, port: u16) {
+            header[0..2].copy_from_slice(&port.to_le_bytes());
+        }
+        fn validate_incoming(&mut self, header: &[u8], port: u16, _reserved: u16) -> Option<u16> {
+            let got = u16::from_le_bytes([header[0], header[1]]);
+            if got == port {
+                Some(1)
+            } else {
+                None
+            }
+        }
+    }
+
+    let mut network = Network::new();
+    let host1 = network.create_host(enet::HostSettings {
+        peer_limit: 1,
+        compressor: Some(Box::new(RangeCoder::new())),
+        checksum: Some(Box::new(crate::crc32)),
+        packet_processor: Some(Box::new(Hdr)),
+        ..Default::default()
+    });
+    let host2 = network.create_host(enet::HostSettings {
+        peer_limit: 1,
+        compressor: Some(Box::new(RangeCoder::new())),
+        checksum: Some(Box::new(crate::crc32)),
+        packet_processor: Some(Box::new(Hdr)),
+        ..Default::default()
+    });
+
+    network.connect(host1, host2, 255, 5);
+    network.update(1);
+    let events = network.update(1);
+    assert_eq!(
+        events.len(),
+        2,
+        "connect should fire with compressor+checksum+processor"
+    );
+    assert!(events[0].is_connect_and(|e| e.to == host1));
+    assert!(events[1].is_connect_and(|e| e.to == host2));
+}
+
+#[test]
+fn compressor_and_checksum() {
+    use crate::{Box, RangeCoder};
+
+    let mut network = Network::new();
+    let host1 = network.create_host(enet::HostSettings {
+        peer_limit: 1,
+        compressor: Some(Box::new(RangeCoder::new())),
+        checksum: Some(Box::new(crate::crc32)),
+        ..Default::default()
+    });
+    let host2 = network.create_host(enet::HostSettings {
+        peer_limit: 1,
+        compressor: Some(Box::new(RangeCoder::new())),
+        checksum: Some(Box::new(crate::crc32)),
+        ..Default::default()
+    });
+
+    network.connect(host1, host2, 255, 5);
+    network.update(1);
+    let events = network.update(1);
+    assert_eq!(events.len(), 2, "compressor+checksum connect should fire");
+}
+
+#[test]
+fn packet_processor_with_compressor() {
+    use crate::{Box, PacketProcessor, RangeCoder};
+
+    struct Noop;
+    impl PacketProcessor for Noop {
+        fn incoming_header_size(&self) -> usize {
+            6
+        }
+        fn write_outgoing(&mut self, _: &mut [u8], _: u16, _: u16) {}
+        fn validate_incoming(&mut self, _: &[u8], _: u16, _: u16) -> Option<u16> {
+            Some(0)
+        }
+    }
+
+    let mut network = Network::new();
+    let host1 = network.create_host(enet::HostSettings {
+        peer_limit: 1,
+        compressor: Some(Box::new(RangeCoder::new())),
+        packet_processor: Some(Box::new(Noop)),
+        ..Default::default()
+    });
+    let host2 = network.create_host(enet::HostSettings {
+        peer_limit: 1,
+        compressor: Some(Box::new(RangeCoder::new())),
+        packet_processor: Some(Box::new(Noop)),
+        ..Default::default()
+    });
+
+    network.connect(host1, host2, 255, 5);
+    network.update(1);
+    let events = network.update(1);
+    assert_eq!(events.len(), 2, "compressor+processor should fire");
+}
+
+#[test]
+fn processor_compressor_header_zero() {
+    use crate::{Box, PacketProcessor, RangeCoder};
+
+    struct Noop;
+    impl PacketProcessor for Noop {
+        fn incoming_header_size(&self) -> usize {
+            0
+        }
+        fn write_outgoing(&mut self, _: &mut [u8], _: u16, _: u16) {}
+        fn validate_incoming(&mut self, _: &[u8], _: u16, _: u16) -> Option<u16> {
+            Some(0)
+        }
+    }
+
+    let mut network = Network::new();
+    let host1 = network.create_host(enet::HostSettings {
+        peer_limit: 1,
+        compressor: Some(Box::new(RangeCoder::new())),
+        packet_processor: Some(Box::new(Noop)),
+        ..Default::default()
+    });
+    let host2 = network.create_host(enet::HostSettings {
+        peer_limit: 1,
+        compressor: Some(Box::new(RangeCoder::new())),
+        packet_processor: Some(Box::new(Noop)),
+        ..Default::default()
+    });
+
+    network.connect(host1, host2, 255, 5);
+    network.update(1);
+    let events = network.update(1);
+    assert_eq!(events.len(), 2, "header=0 compressor+processor should fire");
 }
