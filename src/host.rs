@@ -342,6 +342,13 @@ impl<S: Socket> Host<S> {
         Ok(())
     }
 
+    /// Set or clear the packet processor. See [`PacketProcessor`].
+    pub fn set_packet_processor(&mut self, processor: Option<Box<dyn PacketProcessor>>) {
+        unsafe {
+            enet_host_packet_processor(self.host, processor);
+        }
+    }
+
     /// Get the host's current bandwidth limit as (`incoming bandwidth`, `outgoing bandwidth`) in
     /// bytes/second. Returns [`None`] if there is no limit.
     #[must_use]

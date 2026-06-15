@@ -14,63 +14,37 @@ pub trait Address: Sized + Clone {
     ///
     /// For IP based addresses, checks if this is the IPv4 broadcast address.
     fn is_broadcast(&self) -> bool;
+    /// The port of this address, or [`None`] if this address type has no port
+    /// concept.
+    fn port(&self) -> Option<u16>;
 }
 
 impl Address for () {
-    fn same_host(&self, _other: &()) -> bool {
-        true
-    }
-
-    fn same(&self, _other: &()) -> bool {
-        true
-    }
-
-    fn is_broadcast(&self) -> bool {
-        false
-    }
+    fn same_host(&self, _other: &()) -> bool { true }
+    fn same(&self, _other: &()) -> bool { true }
+    fn is_broadcast(&self) -> bool { false }
+    fn port(&self) -> Option<u16> { None }
 }
-
 impl Address for SocketAddrV4 {
-    fn same_host(&self, other: &Self) -> bool {
-        self.ip() == other.ip()
-    }
-
-    fn same(&self, other: &Self) -> bool {
-        *self == *other
-    }
-
-    fn is_broadcast(&self) -> bool {
-        self.ip().is_broadcast()
-    }
+    fn same_host(&self, other: &Self) -> bool { self.ip() == other.ip() }
+    fn same(&self, other: &Self) -> bool { *self == *other }
+    fn is_broadcast(&self) -> bool { self.ip().is_broadcast() }
+    fn port(&self) -> Option<u16> { Some(self.port()) }
 }
-
 impl Address for SocketAddrV6 {
-    fn same_host(&self, other: &Self) -> bool {
-        self.ip() == other.ip()
-    }
-
-    fn same(&self, other: &Self) -> bool {
-        *self == *other
-    }
-
-    fn is_broadcast(&self) -> bool {
-        false
-    }
+    fn same_host(&self, other: &Self) -> bool { self.ip() == other.ip() }
+    fn same(&self, other: &Self) -> bool { *self == *other }
+    fn is_broadcast(&self) -> bool { false }
+    fn port(&self) -> Option<u16> { Some(self.port()) }
 }
-
 impl Address for SocketAddr {
-    fn same_host(&self, other: &SocketAddr) -> bool {
-        self.ip() == other.ip()
-    }
-
-    fn same(&self, other: &SocketAddr) -> bool {
-        *self == *other
-    }
-
+    fn same_host(&self, other: &SocketAddr) -> bool { self.ip() == other.ip() }
+    fn same(&self, other: &SocketAddr) -> bool { *self == *other }
     fn is_broadcast(&self) -> bool {
         match self {
             SocketAddr::V4(self_addr_v4) => self_addr_v4.ip().is_broadcast(),
             _ => false,
         }
     }
+    fn port(&self) -> Option<u16> { Some(self.port()) }
 }
