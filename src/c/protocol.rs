@@ -1511,7 +1511,7 @@ unsafe fn enet_protocol_handle_incoming_commands<S: Socket>(
             ::core::mem::size_of::<u32>(),
         );
         buffer.data = if !proc_header_ptr.is_null() {
-            proc_header_ptr as *mut u8
+            proc_header_ptr.cast_mut()
         } else {
             (*host).received_data
         };
@@ -1523,10 +1523,7 @@ unsafe fn enet_protocol_handle_incoming_commands<S: Socket>(
         let in_buffers = if !proc_header_ptr.is_null() {
             [
                 super::from_raw_parts_or_empty(buffer.data, buffer.data_length),
-                super::from_raw_parts_or_empty(
-                    (*host).received_data,
-                    (*host).received_data_length,
-                ),
+                super::from_raw_parts_or_empty((*host).received_data, (*host).received_data_length),
             ]
         } else {
             [
