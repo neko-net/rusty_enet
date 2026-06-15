@@ -190,10 +190,12 @@ fn timeout() {
 
 #[test]
 fn packet_processor_connect() {
-    use crate::{PacketProcessor, Box};
+    use crate::{Box, PacketProcessor};
     struct Noop;
     impl PacketProcessor for Noop {
-        fn header_size(&self) -> usize { 0 }
+        fn header_size(&self) -> usize {
+            0
+        }
         fn write_outgoing(&mut self, _: &mut [u8], _: u16, _: u16) {}
         fn validate_incoming(&mut self, _: &[u8], _: u16, _: u16) -> Option<u16> {
             Some(0)
@@ -222,18 +224,24 @@ fn packet_processor_connect() {
 
 #[test]
 fn packet_processor_with_header() {
-    use crate::{PacketProcessor, Box};
+    use crate::{Box, PacketProcessor};
 
     /// 4-byte LE-u32 header with XOR trick: header[0..4] = port as LE u32.
     struct XorHeader;
     impl PacketProcessor for XorHeader {
-        fn header_size(&self) -> usize { 4 }
+        fn header_size(&self) -> usize {
+            4
+        }
         fn write_outgoing(&mut self, header: &mut [u8], _peer_id: u16, port: u16) {
             header[0..2].copy_from_slice(&port.to_le_bytes());
         }
         fn validate_incoming(&mut self, header: &[u8], port: u16, _reserved: u16) -> Option<u16> {
             let got = u16::from_le_bytes([header[0], header[1]]);
-            if got == port { Some(1) } else { None }
+            if got == port {
+                Some(1)
+            } else {
+                None
+            }
         }
     }
 

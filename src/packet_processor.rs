@@ -44,7 +44,9 @@ mod tests {
     struct TestProcessor;
 
     impl PacketProcessor for TestProcessor {
-        fn header_size(&self) -> usize { 6 }
+        fn header_size(&self) -> usize {
+            6
+        }
 
         fn write_outgoing(&mut self, header: &mut [u8], _peer_id: u16, port: u16) {
             header[0..2].copy_from_slice(&port.to_be_bytes());

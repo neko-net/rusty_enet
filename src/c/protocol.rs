@@ -1451,9 +1451,7 @@ unsafe fn enet_protocol_handle_incoming_commands<S: Socket>(
         }
     }
     if !proc_header_ptr.is_null() && !peer.is_null() {
-        let processor = (*host).packet_processor.assume_init_mut()
-            .as_mut()
-            .unwrap();
+        let processor = (*host).packet_processor.assume_init_mut().as_mut().unwrap();
         let proc_header = super::from_raw_parts_or_empty(proc_header_ptr, proc_size);
         let port = (*host).local_port;
         match processor.validate_incoming(proc_header, port, (*peer).reserved) {
