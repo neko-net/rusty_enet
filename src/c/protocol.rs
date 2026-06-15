@@ -1396,6 +1396,17 @@ unsafe fn enet_protocol_handle_incoming_commands<S: Socket>(
     if (*host).received_data_length < 2_usize {
         return false;
     }
+    let mut proc_header_ptr: *const u8 = core::ptr::null();
+    let mut proc_size: usize = 0;
+    if let Some(processor) = (*host).packet_processor.assume_init_ref() {
+        proc_size = processor.header_size();
+        if (*host).received_data_length < proc_size + 2 {
+            return false;
+        }
+        proc_header_ptr = (*host).received_data;
+        (*host).received_data = (*host).received_data.add(proc_size);
+        (*host).received_data_length = (*host).received_data_length.wrapping_sub(proc_size);
+    }
     let header: *mut ENetProtocolHeader = (*host).received_data.cast();
     peer_id = u16::from_be((*header).peer_id);
     let session_id = ((peer_id as i32 & ENET_PROTOCOL_HEADER_SESSION_MASK as i32)
@@ -1437,6 +1448,15 @@ unsafe fn enet_protocol_handle_incoming_commands<S: Socket>(
                 && session_id as i32 != (*peer).incoming_session_id as i32
         {
             return false;
+        }
+    }
+    if !proc_header_ptr.is_null() && !peer.is_null() {
+        let processor = (*host).packet_processor.assume_init_mut().as_mut().unwrap();
+        let proc_header = super::from_raw_parts_or_empty(proc_header_ptr, proc_size);
+        let port = (*host).local_port;
+        match processor.validate_incoming(proc_header, port, (*peer).reserved) {
+            Some(new_reserved) => (*peer).reserved = new_reserved,
+            None => return false,
         }
     }
     if flags as i32 & ENET_PROTOCOL_HEADER_FLAG_COMPRESSED as i32 != 0 {
@@ -2085,8 +2105,14 @@ unsafe fn enet_protocol_send_outgoing_commands<S: Socket>(
     event: *mut ENetEvent<S>,
     check_for_timeouts: i32,
 ) -> Result<bool, S::Error> {
-    let mut header_data: [u8; 8] = [0; 8];
-    let header: *mut ENetProtocolHeader = header_data.as_mut_ptr().cast();
+    let proc_size = (*host)
+        .packet_processor
+        .assume_init_ref()
+        .as_ref()
+        .map_or(0, |p| p.header_size());
+    let mut header_data: [u8; 64] = [0; 64];
+    let proc_header: *mut u8 = header_data.as_mut_ptr();
+    let header: *mut ENetProtocolHeader = header_data.as_mut_ptr().add(proc_size).cast();
     let mut should_compress: usize;
     let mut sent_unreliable_commands: ENetList = ENetList {
         sentinel: ENetListNode {
@@ -2111,7 +2137,8 @@ unsafe fn enet_protocol_send_outgoing_commands<S: Socket>(
                 (*host).header_flags = 0_i32 as u16;
                 (*host).command_count = 0_i32 as usize;
                 (*host).buffer_count = 1_i32 as usize;
-                (*host).packet_size = ::core::mem::size_of::<ENetProtocolHeader>();
+                (*host).packet_size =
+                    ::core::mem::size_of::<ENetProtocolHeader>().wrapping_add(proc_size);
                 if (*current_peer).acknowledgements.sentinel.next
                     != core::ptr::addr_of_mut!((*current_peer).acknowledgements.sentinel)
                 {
@@ -2199,20 +2226,39 @@ unsafe fn enet_protocol_send_outgoing_commands<S: Socket>(
                         }
                         let fresh34 = &mut (*((*host).buffers).as_mut_ptr()).data;
                         *fresh34 = header_data.as_mut_ptr();
+                        if proc_size > 0 {
+                            if let Some(processor) = (*host).packet_processor.assume_init_mut() {
+                                let header_slice =
+                                    super::from_raw_parts_or_empty_mut(proc_header, proc_size);
+                                let peer_port = (*current_peer)
+                                    .address
+                                    .assume_init_ref()
+                                    .as_ref()
+                                    .and_then(|a| a.port())
+                                    .unwrap_or(0);
+                                processor.write_outgoing(
+                                    header_slice,
+                                    (*current_peer).outgoing_peer_id,
+                                    peer_port,
+                                );
+                            }
+                        }
                         if (*host).header_flags as i32 & ENET_PROTOCOL_HEADER_FLAG_SENT_TIME as i32
                             != 0
                         {
                             (*header).sent_time =
                                 (((*host).service_time & 0xffff_i32 as u32) as u16).to_be();
-                            (*((*host).buffers).as_mut_ptr()).data_length =
-                                ::core::mem::size_of::<ENetProtocolHeader>();
+                            (*((*host).buffers).as_mut_ptr()).data_length = proc_size
+                                .wrapping_add(::core::mem::size_of::<ENetProtocolHeader>());
                         } else {
-                            (*((*host).buffers).as_mut_ptr()).data_length = 2;
+                            (*((*host).buffers).as_mut_ptr()).data_length =
+                                proc_size.wrapping_add(2);
                         }
                         should_compress = 0_i32 as usize;
                         if let Some(compressor) = (*host).compressor.assume_init_mut() {
                             let original_size: usize = ((*host).packet_size)
-                                .wrapping_sub(::core::mem::size_of::<ENetProtocolHeader>());
+                                .wrapping_sub(::core::mem::size_of::<ENetProtocolHeader>())
+                                .wrapping_sub(proc_size);
                             let mut in_buffers: [&[u8]; BUFFER_MAXIMUM as usize] =
                                 core::array::from_fn(|_| {
                                     from_raw_parts_or_empty::<u8>(core::ptr::null(), 0)

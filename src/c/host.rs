@@ -4,7 +4,7 @@ use crate::{
     consts::*, enet_free, enet_list_clear, enet_malloc, enet_packet_destroy,
     enet_peer_queue_outgoing_command, enet_peer_reset, enet_peer_send, enet_time_get, Box,
     Compressor, ENetBuffer, ENetChannel, ENetList, ENetPacket, ENetPeer, ENetProtocol,
-    ENetProtocolCommandHeader, Socket, SocketOptions, ENET_PEER_STATE_CONNECTED,
+    ENetProtocolCommandHeader, PacketProcessor, Socket, SocketOptions, ENET_PEER_STATE_CONNECTED,
     ENET_PEER_STATE_CONNECTING, ENET_PEER_STATE_DISCONNECTED, ENET_PEER_STATE_DISCONNECT_LATER,
     ENET_PROTOCOL_COMMAND_BANDWIDTH_LIMIT, ENET_PROTOCOL_COMMAND_CONNECT,
     ENET_PROTOCOL_COMMAND_FLAG_ACKNOWLEDGE,
@@ -34,6 +34,8 @@ pub(crate) struct ENetHost<S: Socket> {
     pub(crate) checksum: MaybeUninit<Option<Box<dyn Fn(&[&[u8]]) -> u32>>>,
     pub(crate) time: MaybeUninit<Box<dyn Fn() -> Duration>>,
     pub(crate) compressor: MaybeUninit<Option<Box<dyn Compressor>>>,
+    pub(crate) packet_processor: MaybeUninit<Option<Box<dyn PacketProcessor>>>,
+    pub(crate) local_port: u16,
     pub(crate) packet_data: [[u8; PROTOCOL_MAXIMUM_MTU]; 2],
     pub(crate) received_address: MaybeUninit<Option<S::Address>>,
     pub(crate) received_data: *mut u8,
@@ -105,6 +107,8 @@ pub(crate) unsafe fn enet_host_create<S: Socket>(
     (*host).maximum_packet_size = HOST_DEFAULT_MAXIMUM_PACKET_SIZE as i32 as usize;
     (*host).maximum_waiting_data = HOST_DEFAULT_MAXIMUM_WAITING_DATA as i32 as usize;
     (*host).compressor.write(None);
+    (*host).packet_processor.write(None);
+    (*host).local_port = 0;
     enet_list_clear(&mut (*host).dispatch_queue);
     current_peer = (*host).peers;
     while current_peer < ((*host).peers).add((*host).peer_count) {
@@ -139,6 +143,7 @@ pub(crate) unsafe fn enet_host_destroy<S: Socket>(host: *mut ENetHost<S>) {
     (*host).checksum.assume_init_drop();
     (*host).time.assume_init_drop();
     (*host).compressor.assume_init_drop();
+    (*host).packet_processor.assume_init_drop();
     (*host).received_address.assume_init_drop();
     enet_free(
         (*host).peers.cast(),
@@ -264,6 +269,15 @@ pub(crate) unsafe fn enet_host_compress<S: Socket>(
     compressor: Option<Box<dyn Compressor>>,
 ) {
     *(*host).compressor.assume_init_mut() = compressor;
+}
+pub(crate) unsafe fn enet_host_packet_processor<S: Socket>(
+    host: *mut ENetHost<S>,
+    processor: Option<Box<dyn PacketProcessor>>,
+) {
+    *(*host).packet_processor.assume_init_mut() = processor;
+}
+pub(crate) unsafe fn enet_host_set_local_port<S: Socket>(host: *mut ENetHost<S>, port: u16) {
+    (*host).local_port = port;
 }
 pub(crate) unsafe fn enet_host_channel_limit<S: Socket>(
     host: *mut ENetHost<S>,

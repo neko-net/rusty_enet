@@ -9,10 +9,11 @@ use crate::{
     },
     enet_host_bandwidth_limit, enet_host_broadcast, enet_host_channel_limit,
     enet_host_check_events, enet_host_compress, enet_host_connect, enet_host_create,
-    enet_host_destroy, enet_host_flush, enet_host_service,
+    enet_host_destroy, enet_host_flush, enet_host_packet_processor, enet_host_service,
+    enet_host_set_local_port,
     error::{BadParameter, HostNewError, NoAvailablePeers},
-    time_since_epoch, Compressor, ENetEvent, ENetHost, ENetPeer, Event, Packet, Peer, PeerID,
-    PeerState, Socket, ENET_EVENT_TYPE_CONNECT, ENET_EVENT_TYPE_DISCONNECT,
+    time_since_epoch, Compressor, ENetEvent, ENetHost, ENetPeer, Event, Packet, PacketProcessor,
+    Peer, PeerID, PeerState, Socket, ENET_EVENT_TYPE_CONNECT, ENET_EVENT_TYPE_DISCONNECT,
     ENET_EVENT_TYPE_RECEIVE,
 };
 
@@ -43,6 +44,8 @@ pub struct HostSettings {
     pub time: Box<dyn Fn() -> Duration>,
     /// Seed the host with a specific random seed, or set to [`None`] to use a random seed.
     pub seed: Option<u32>,
+    /// Optional packet processor. See [`PacketProcessor`] for details.
+    pub packet_processor: Option<Box<dyn PacketProcessor>>,
 }
 
 impl Default for HostSettings {
@@ -56,6 +59,7 @@ impl Default for HostSettings {
             checksum: None,
             time: Box::new(time_since_epoch),
             seed: None,
+            packet_processor: None,
         }
     }
 }
@@ -113,6 +117,7 @@ impl<S: Socket> Host<S> {
             }));
         }
         unsafe {
+            let local_port = socket.local_port().unwrap_or(0);
             let host = enet_host_create::<S>(
                 socket,
                 settings.peer_limit,
@@ -123,6 +128,8 @@ impl<S: Socket> Host<S> {
                 settings.seed,
             )
             .map_err(|err| HostNewError::FailedToInitializeSocket(err))?;
+            enet_host_packet_processor(host, settings.packet_processor);
+            enet_host_set_local_port(host, local_port);
             let mut peers = Vec::new();
             peers.reserve_exact((*host).peer_count);
             for peer_index in 0..(*host).peer_count {
@@ -333,6 +340,13 @@ impl<S: Socket> Host<S> {
             enet_host_channel_limit(self.host, channel_limit);
         }
         Ok(())
+    }
+
+    /// Set or clear the packet processor. See [`PacketProcessor`].
+    pub fn set_packet_processor(&mut self, processor: Option<Box<dyn PacketProcessor>>) {
+        unsafe {
+            enet_host_packet_processor(self.host, processor);
+        }
     }
 
     /// Get the host's current bandwidth limit as (`incoming bandwidth`, `outgoing bandwidth`) in

@@ -94,6 +94,10 @@ impl<A: crate::Address> crate::Address for Address<A> {
     fn is_broadcast(&self) -> bool {
         A::is_broadcast(&self.address)
     }
+
+    fn port(&self) -> Option<u16> {
+        A::port(&self.address)
+    }
 }
 
 /// A trait for implementing connection based sockets, similar to [`Socket`](`crate::Socket`).
