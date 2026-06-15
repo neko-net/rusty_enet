@@ -2232,10 +2232,16 @@ unsafe fn enet_protocol_send_outgoing_commands<S: Socket>(
                             if let Some(processor) = (*host).packet_processor.assume_init_mut() {
                                 let header_slice =
                                     super::from_raw_parts_or_empty_mut(proc_header, proc_size);
+                                let peer_port = (*current_peer)
+                                    .address
+                                    .assume_init_ref()
+                                    .as_ref()
+                                    .and_then(|a| a.port())
+                                    .unwrap_or(0);
                                 processor.write_outgoing(
                                     header_slice,
                                     (*current_peer).outgoing_peer_id,
-                                    (*host).local_port,
+                                    peer_port,
                                 );
                             }
                         }

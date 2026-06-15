@@ -26,7 +26,7 @@ pub trait PacketProcessor: Send {
     /// Write the processor header bytes before an outgoing packet is sent.
     ///
     /// `peer_id` is the peer this packet is addressed to.
-    /// `port` is the host socket's local port.
+    /// `port` is the remote peer's port (destination).
     fn write_outgoing(&mut self, header: &mut [u8], peer_id: u16, port: u16);
 
     /// Validate the processor header bytes from an incoming packet.
