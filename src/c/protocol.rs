@@ -1515,11 +1515,25 @@ unsafe fn enet_protocol_handle_incoming_commands<S: Socket>(
         } else {
             (*host).received_data
         };
-        buffer.data_length = (*host).received_data_length.wrapping_add(proc_size);
-        let in_buffers = [super::from_raw_parts_or_empty(
-            buffer.data,
-            buffer.data_length,
-        )];
+        buffer.data_length = if !proc_header_ptr.is_null() {
+            proc_size
+        } else {
+            (*host).received_data_length
+        };
+        let in_buffers = if !proc_header_ptr.is_null() {
+            [
+                super::from_raw_parts_or_empty(buffer.data, buffer.data_length),
+                super::from_raw_parts_or_empty(
+                    (*host).received_data,
+                    (*host).received_data_length,
+                ),
+            ]
+        } else {
+            [
+                super::from_raw_parts_or_empty(buffer.data, buffer.data_length),
+                super::from_raw_parts_or_empty(core::ptr::null(), 0),
+            ]
+        };
         if checksum_fn(&in_buffers) != desired_checksum {
             return false;
         }
