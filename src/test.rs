@@ -264,3 +264,38 @@ fn packet_processor_with_header() {
     assert!(events[0].is_connect_and(|e| e.to == host1));
     assert!(events[1].is_connect_and(|e| e.to == host2));
 }
+
+#[test]
+fn packet_processor_with_checksum() {
+    use crate::{Box, PacketProcessor};
+
+    struct Noop;
+    impl PacketProcessor for Noop {
+        fn header_size(&self) -> usize { 4 }
+        fn write_outgoing(&mut self, _: &mut [u8], _: u16, _: u16) {}
+        fn validate_incoming(&mut self, _: &[u8], _: u16, _: u16) -> Option<u16> {
+            Some(0)
+        }
+    }
+
+    let mut network = Network::new();
+    let host1 = network.create_host(enet::HostSettings {
+        peer_limit: 1,
+        checksum: Some(Box::new(crate::crc32)),
+        packet_processor: Some(Box::new(Noop)),
+        ..Default::default()
+    });
+    let host2 = network.create_host(enet::HostSettings {
+        peer_limit: 1,
+        checksum: Some(Box::new(crate::crc32)),
+        packet_processor: Some(Box::new(Noop)),
+        ..Default::default()
+    });
+
+    network.connect(host1, host2, 255, 5);
+    network.update(1);
+    let events = network.update(1);
+    assert_eq!(events.len(), 2, "connect events should fire with checksum+processor");
+    assert!(events[0].is_connect_and(|e| e.to == host1));
+    assert!(events[1].is_connect_and(|e| e.to == host2));
+}

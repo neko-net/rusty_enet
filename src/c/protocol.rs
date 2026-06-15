@@ -1510,8 +1510,12 @@ unsafe fn enet_protocol_handle_incoming_commands<S: Socket>(
             checksum_addr,
             ::core::mem::size_of::<u32>(),
         );
-        buffer.data = (*host).received_data;
-        buffer.data_length = (*host).received_data_length;
+        buffer.data = if !proc_header_ptr.is_null() {
+            proc_header_ptr as *mut u8
+        } else {
+            (*host).received_data
+        };
+        buffer.data_length = (*host).received_data_length.wrapping_add(proc_size);
         let in_buffers = [super::from_raw_parts_or_empty(
             buffer.data,
             buffer.data_length,
